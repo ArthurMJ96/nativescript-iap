@@ -39,7 +39,20 @@ export class InAppPurchase extends Observable {
     public purchase(product: Product): void;
 
     /**
+     * Initiates the purchase for a product with given AccountIdentifiers.
+     * @param product Purchased product.
+     * @param obfuscatedAccountId Obfuscated account id.
+     * @param obfuscatedProfileId Obfuscated profile id.
+     * 
+     * @summary
+     * Use to ensure that a purchase is correctly attributed to the in-game character/avatar or in-app user profile that initiated the purchase.
+     * Replaces the deprecated developer payload.
+     */
+    public purchaseWithAttribution(product: Product, obfuscatedAccountId: string, obfuscatedProfileId: string): void;
+
+    /**
      * Restores previously completed purchases.
+     * Returned Purchases contain "TransactionState.restored".
      * 
      * @summary
      * Use this method to restore completed transactions that is,
@@ -47,6 +60,21 @@ export class InAppPurchase extends Observable {
      * Not restoring a non-renewing subscription or a consumable product.
      */
     public restorePurchases(): Promise<void>;
+    
+
+    /**
+     * Restores previously completed transaction. 
+     * Returned transactions contain "TransactionState.purchased".
+     * @summary
+     * Only active subscriptions and non-consumed purchases are returned.
+     * You can use this to make sure consumable purchases still get consumed by your logic.
+     * Incase the App crashed or any other purchase flow interruptions.
+     * 
+     * Returned transactions also expose AccountIdentifiers.
+     * Example: transaction.nativeObject.getAccountIdentifiers().getObfuscatedAccountId()
+     * 
+     */
+     public restorePurchasesWithDetails(): Promise<void>;
 
     /**
      * Shows the price consent sheet if the user has not yet responded to a subscription price increase.

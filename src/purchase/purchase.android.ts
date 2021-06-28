@@ -215,6 +215,19 @@ export class InAppPurchase extends InAppPurchaseBase {
         const activity = Application.android.foregroundActivity || Application.android.startActivity;
         this.nativeObject.launchBillingFlow(activity, billingFlowParams);
     }
+    
+    public async purchaseWithAttribution(product: Product, obfuscatedAccountId: string, obfuscatedProfileId: string): Promise<void> {
+        await this.connectAsync();
+        
+        const billingFlowParams = com.android.billingclient.api.BillingFlowParams.newBuilder()
+            .setObfuscatedAccountId(obfuscatedAccountId)
+            .setObfuscatedProfileId(obfuscatedProfileId)
+            .setSkuDetails(product.nativeObject)
+            .build();
+
+        const activity = Application.android.foregroundActivity || Application.android.startActivity;
+        this.nativeObject.launchBillingFlow(activity, billingFlowParams);
+    }
 
     public async restorePurchases(): Promise<void> {
         await this.connectAsync();
@@ -227,6 +240,50 @@ export class InAppPurchase extends InAppPurchaseBase {
         }
         
         nativeTransactions = await this.getNativePurchaseHistory(com.android.billingclient.api.BillingClient.SkuType.SUBS);
+        for (let i = 0; i < nativeTransactions.length; i++) {
+            transactions.push(new Transaction(nativeTransactions[i]));
+        }
+
+        this.notify<PurchaseEventData>({
+            eventName: InAppPurchase.purchaseUpdatedEvent,
+            object: this,
+            transactions: transactions
+        });
+    }
+    
+    private getNativePurchaseHistoryAndQueryPurchases(skuType: string) {
+        return new Promise<androidNative.Array<com.android.billingclient.api.SkuDetails>>((resolve, reject) => {
+            const nativeObject = this.nativeObject;
+            nativeObject.queryPurchaseHistoryAsync(
+                skuType,
+                new com.android.billingclient.api.PurchaseHistoryResponseListener({
+                    onPurchaseHistoryResponse(billingResult, purchaseHistoryRecordList) {
+                        if (billingResult.getResponseCode() === com.android.billingclient.api.BillingClient.BillingResponseCode.OK) {
+                            // "queryPurchases" - Only active subscriptions and non-consumed one-time purchases are returned.
+                            resolve(
+                                nativeObject.queryPurchases(skuType)
+                                .getPurchasesList()
+                                .toArray()
+                            );
+                        } else {
+                            reject(billingResult.getDebugMessage());
+                        }
+                    }
+                }));
+        });
+    }
+
+    public async restorePurchasesWithDetails(): Promise<void> {
+        await this.connectAsync();
+
+        const transactions = new Array<Transaction>();
+
+        let nativeTransactions = await this.getNativePurchaseHistoryAndQueryPurchases(com.android.billingclient.api.BillingClient.SkuType.INAPP);
+        for (let i = 0; i < nativeTransactions.length; i++) {
+            transactions.push(new Transaction(nativeTransactions[i]));
+        }
+        
+        nativeTransactions = await this.getNativePurchaseHistoryAndQueryPurchases(com.android.billingclient.api.BillingClient.SkuType.SUBS);
         for (let i = 0; i < nativeTransactions.length; i++) {
             transactions.push(new Transaction(nativeTransactions[i]));
         }
